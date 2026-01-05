@@ -84,6 +84,12 @@ The API is versioned and designed to be consumed by web or mobile clients.
 https://assessment-ai-1.onrender.com
 ```
 
+## Postman Documentation Link
+
+```
+https://documenter.getpostman.com/view/21411890/2sBXVcnDFe
+```
+
 Current API Version: **v1.0**
 
 ---

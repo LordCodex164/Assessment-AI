@@ -9,8 +9,7 @@ from .serializers import (
     ExamListSerializer,
     ExamCreateSerializer,
     QuestionCreateSerializer,
-    BulkQuestionCreateSerializer,
-)
+    )
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from grading.keyword_grader import GradingService
@@ -38,9 +37,6 @@ class ExamView(viewsets.ViewSet):
     """
 
     def get_permissions(self):
-        """
-        Instantiate and return the list of permissions
-        """
         if self.action in ["create", "create_questions", "bulk_create_questions"]:
             permission_classes = [IsStaffUser]
         else:
@@ -113,7 +109,6 @@ class ExamView(viewsets.ViewSet):
             )
             .select_related("course")
         )
-        print(">>> Exams QuerySet:", exams.query)
         serializer = self.get_serializer_class()(exams, many=True)
         data = {
             "exams": serializer.data,
@@ -151,7 +146,6 @@ class ExamView(viewsets.ViewSet):
 
     @transaction.atomic
     def create(self, request):
-        print(">>> Exam Creation Request Data:", request.data)
         try:
             serializer = ExamCreateSerializer(data=request.data)
 
@@ -166,21 +160,16 @@ class ExamView(viewsets.ViewSet):
             # Set the creator to current user
             exam = serializer.save(created_by=request.user)
 
-            print(">>> Exam Created with ID:", exam.id)
-
             response_data = {
                 "exam_id": exam.id,
                 "title": exam.title,
                 "questions_created": exam.questions.count(),
             }
 
-            print(">>> Exam Creation Response Data:", response_data)
-
             return custom_response(
                 data=response_data, message="Exam created successfully", status_code=201
             )
         except Exception as e:
-            # Log the error for debugging
             print(f"Exam creation error: {str(e)}")
             return custom_response(
                 message="An error occurred while creating the exam. Please try again.",
@@ -188,48 +177,8 @@ class ExamView(viewsets.ViewSet):
                 status_code=500
             )
 
-    @action(detail=False, methods=["post"], url_path="bulk-questions")
-    def bulk_create_questions(self, request):
-    
-        serializer = BulkQuestionCreateSerializer(
-            data=request.data, context={"request": request}
-        )
-
-        if not serializer.is_valid():
-            return custom_response(
-                data=serializer.errors,
-                message="Validation failed",
-                success=False,
-                status_code=400,
-            )
-
-        exam_id = serializer.validated_data["exam_id"]
-        questions_data = serializer.validated_data["questions"]
-
-        exam = Exam.objects.get(id=exam_id)
-
-        # Bulk create questions
-        questions_to_create = [
-            Question(exam=exam, **question_data) for question_data in questions_data
-        ]
-
-        created_questions = Question.objects.bulk_create(questions_to_create)
-
-        response_data = {
-            "exam_id": exam.id,
-            "questions_created": len(created_questions),
-            "total_questions": exam.questions.count(),
-        }
-
-        return custom_response(
-            data=response_data,
-            message=f"{len(created_questions)} questions added successfully",
-            status_code=201,
-        )
-
 
 method_decorator(csrf_exempt, name="dispatch")
-
 
 class SubmissionViewSet(viewsets.ModelViewSet):
     """
@@ -249,17 +198,6 @@ class SubmissionViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def post(self, request):
-        """
-        OPTIMIZED: Submit exam answers
-
-        Key optimizations:
-        1. Bulk operations where possible
-        2. select_for_update to prevent race conditions
-        3. Efficient question validation
-        4. Minimal database queries
-        """
-
-        print(">>> Submission Request Data:", request.data)
         serializer = SubmissionCreateSerializer(data=request.data)
 
         if not serializer.is_valid():
@@ -271,11 +209,7 @@ class SubmissionViewSet(viewsets.ModelViewSet):
             )
 
         exam_id = serializer.validated_data["exam_id"]
-        print(">>> Exam ID:", exam_id)
         answers_data = serializer.validated_data["answers"]
-        print(">>> Answers Data Type:", type(answers_data))
-
-        print(">>> Answers Data:", answers_data)
 
         try:
             # Use select_related and only() for efficiency
@@ -292,11 +226,7 @@ class SubmissionViewSet(viewsets.ModelViewSet):
                 message="Exam not found", success=False, status_code=404
             )
 
-        # ✅ NOW validate answer count (after exam is fetched)
         exam_question_count = exam.questions.count()
-        print(
-            f">>> Exam has {exam_question_count} questions, received {len(answers_data)} answers"
-        )
 
         if len(answers_data) != exam_question_count:
             return custom_response(
@@ -319,15 +249,6 @@ class SubmissionViewSet(viewsets.ModelViewSet):
                 status_code=400,
             )
 
-        print(">>> Validated Answers Data:", answers_data)
-
-        print(
-            ">>> Number of Answers Submitted:",
-            len(answers_data),
-            "for Exam Questions:",
-            exam.questions.count(),
-        )
-
         # Create submission
         submission = Submission.objects.create(
             student=request.user,
@@ -345,8 +266,6 @@ class SubmissionViewSet(viewsets.ModelViewSet):
                 "id", "question_type", "marks", "expected_answer", "text"
             )
         }
-
-        print(">>> Fetched Questions:", questions)
 
         # Prepare bulk answer creation
         answers_to_create = []
@@ -435,31 +354,13 @@ class SubmissionViewSet(viewsets.ModelViewSet):
                 # use the id of the question related to this answer to retrieve the question
                 question_id = answer.question.id
                 question = questions[question_id]
-                print(
-                    ">>> Grading Question ID:",
-                    {"question_id": question_id, "text": question.text},
-                )
+
                 awarded_marks, feedback, metadata = grader.grade_answer(
                     question, answer.answer_text
                 )
-                print(
-                    ">>> Graded Marks:",
-                    awarded_marks,
-                    "Feedback:",
-                    feedback,
-                    "Metadata:",
-                    metadata,
-                )
+    
                 answer.awarded_marks = Decimal(str(awarded_marks))
-                print(">>> Updated Answer Marks:", answer.awarded_marks)
                 answers_to_update.append(answer)
-
-                print(
-                    ">>> Answer after grading:",
-                    {"answer_id": answer.id, "awarded_marks": answer.awarded_marks},
-                )
-
-                print("anserds to update:", answers_to_update)
 
             except Exception as e:
                 logger.error(f"Error grading answer {answer.id}: {str(e)}")
@@ -477,8 +378,7 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         exam_total = (
             submission.exam.questions.aggregate(total=Sum("marks"))["total"] or 0
         )
-        print(">>> Exam Total Marks:", exam_total)
-        print(">>> Submission Total Score:", submission.total_score)
+    
         submission.percentage = (
             (submission.total_score / exam_total * 100)
             if exam_total > 0
