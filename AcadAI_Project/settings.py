@@ -28,7 +28,7 @@ SECRET_KEY = 'django-insecure-70s+@9zsm4#f3_ndubl5a(=a@^^da5=n&@w7+f$bc&cm91ci&+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["assessment-ai-1.onrender.com"]
 
 CSRF_TRUSTED_ORIGINS = [
     "https:///your-app.onrender.com",
