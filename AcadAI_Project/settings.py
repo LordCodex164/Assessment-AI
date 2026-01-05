@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,9 +25,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-70s+@9zsm4#f3_ndubl5a(=a@^^da5=n&@w7+f$bc&cm91ci&+'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = []
+
+CSRF_TRUSTED_ORIGINS = [
+    "https:///your-app.onrender.com",
+]
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
