@@ -311,7 +311,7 @@ Relational integrity is enforced via foreign keys.
 ## Local Development
 
 ```bash
-git clone https://github.com/your-username/assessment-i.git
+git clone https://github.com/your-username/assessment-ai.git
 cd mini-acad-engine
 python -m venv venv
 source venv/bin/activate
